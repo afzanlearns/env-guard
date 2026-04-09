@@ -4,7 +4,8 @@
   "description": "EnvGuard - Schema-based env syncing tool",
   "workspaces": [
     "envguard-cli",
-    "envguard-api"
+    "envguard-api",
+    "envguard-web"
   ],
   "engines": {
     "node": ">=18.0.0"

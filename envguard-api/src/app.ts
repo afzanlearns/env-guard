@@ -9,12 +9,35 @@ const PORT = process.env.PORT || 3000;
 
 import authRoutes from './routes/auth';
 import schemaRoutes from './routes/schema';
+import projectRoutes from './routes/projects';
+import passport from './services/auth.service';
+import session from 'express-session';
+import connectPgSimple from 'connect-pg-simple';
+import { pool } from './db';
 
-app.use(cors());
+const PgStore = connectPgSimple(session);
+
+app.use(cors({ origin: 'http://localhost:5173', credentials: true }));
 app.use(express.json());
+
+app.use(session({
+  store: new PgStore({ pool, tableName: 'session' }), // Note: Assuming we create a standard session table. If omitted, we'll need to run connect-pg-simple's default table sql
+  secret: process.env.SESSION_SECRET || 'envguard-dev-secret',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { 
+    maxAge: 30 * 24 * 60 * 60 * 1000, 
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true
+  }
+}));
+
+app.use(passport.initialize());
+app.use(passport.session());
 
 app.use('/auth', authRoutes);
 app.use('/api/schema', schemaRoutes);
+app.use('/api/projects', projectRoutes);
 
 // Basic healthcheck
 app.get('/', (req, res) => {
