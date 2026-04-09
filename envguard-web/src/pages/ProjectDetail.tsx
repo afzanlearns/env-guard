@@ -5,6 +5,7 @@ import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
 import { AlertCircle, PlusCircle, RefreshCw } from 'lucide-react';
+import { api } from '../lib/api';
 
 interface SchemaVariable {
   key: string;
@@ -18,18 +19,20 @@ export default function ProjectDetail() {
   const { slug } = useParams();
   const [variables, setVariables] = useState<SchemaVariable[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    // Mock Data for Schema details
-    setTimeout(() => {
-      setVariables([
-        { key: 'DATABASE_URL', type: 'url', description: 'Primary Postgres connection string', required: true, defaultHint: 'postgres://localhost:5432/db' },
-        { key: 'API_KEY', type: 'secret', description: 'Internal Service API Key (Never sync value)', required: true, defaultHint: null },
-        { key: 'PORT', type: 'port', description: 'Web server port', required: false, defaultHint: '3000' },
-        { key: 'ENABLE_FEATURE_X', type: 'boolean', description: 'Toggles Beta Feature X', required: true, defaultHint: 'false' },
-      ]);
-      setLoading(false);
-    }, 600);
+    const fetchSchema = async () => {
+      try {
+        const { data } = await api.get(`/api/schema/pull?projectSlug=${slug}&environment=development`);
+        setVariables(data.variables);
+      } catch (err) {
+        setError('Failed to fetch schema details. Are your settings correct?');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchSchema();
   }, [slug]);
 
   return (

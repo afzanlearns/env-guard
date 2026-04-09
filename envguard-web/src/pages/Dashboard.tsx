@@ -2,13 +2,13 @@ import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
+import { api } from '../lib/api';
 
 interface Project {
   id: string;
   name: string;
   slug: string;
-  environments: string[];
+  environments: Array<{ id: string; name: string }>;
 }
 
 export default function Dashboard() {
@@ -16,14 +16,22 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Mock data for immediate aesthetic feedback
-    setTimeout(() => {
-      setProjects([
-        { id: '1', name: 'Authentication Microservice', slug: 'auth-ms', environments: ['development', 'staging', 'production'] },
-        { id: '2', name: 'Main Frontend API', slug: 'frontend-api', environments: ['development', 'test', 'production'] }
-      ]);
-      setLoading(false);
-    }, 500);
+    const fetchProjects = async () => {
+      try {
+        const { data } = await api.get('/api/projects');
+        // We'd need to properly join environments on the backend, for now, mock the envs array slightly 
+        // if the basic API just returns the project row
+        setProjects(data.projects.map((p: any) => ({
+          ...p,
+          environments: p.environments || [{name: 'development'}, {name: 'staging'}, {name: 'production'}] // Fallback if API hasn't enriched them
+        })));
+      } catch (err) {
+        console.error("Failed fetching projects");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProjects();
   }, []);
 
   return (
@@ -38,6 +46,11 @@ export default function Dashboard() {
 
       {loading ? (
         <div className="h-40 flex items-center justify-center text-muted-foreground">Loading projects...</div>
+      ) : projects.length === 0 ? (
+        <div className="h-40 flex flex-col items-center justify-center text-muted-foreground border rounded-lg border-dashed">
+          <p>No projects found.</p>
+          <Button variant="link" className="mt-2 text-primary">Create your first project</Button>
+        </div>
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {projects.map((proj) => (
@@ -49,9 +62,9 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="flex gap-2 flex-wrap">
-                    {proj.environments.map(e => (
-                      <span key={e} className="px-2 py-1 bg-secondary text-secondary-foreground rounded-md text-xs font-medium">
-                        {e}
+                    {proj.environments.map((e, idx) => (
+                      <span key={idx} className="px-2 py-1 bg-secondary text-secondary-foreground rounded-md text-xs font-medium">
+                        {e.name}
                       </span>
                     ))}
                   </div>
