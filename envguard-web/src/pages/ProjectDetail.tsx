@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
-import { AlertCircle, PlusCircle, RefreshCw } from 'lucide-react';
+import { PlusCircle, RefreshCw, Zap } from 'lucide-react';
 import { api } from '../lib/api';
+import { useDrift } from '../hooks/useDrift';
 
 interface SchemaVariable {
   key: string;
@@ -20,21 +21,35 @@ export default function ProjectDetail() {
   const [variables, setVariables] = useState<SchemaVariable[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [projectId, setProjectId] = useState<string | null>(null);
+
+  const { driftPayload, resetDriftAlert } = useDrift(projectId);
+
+  const fetchSchema = useCallback(async () => {
+    try {
+      const { data } = await api.get(`/api/schema/pull?projectSlug=${slug}&environment=development`);
+      setVariables(data.variables);
+      setProjectId(data.projectId);
+    } catch (err) {
+      setError('Failed to fetch schema details. Are your settings correct?');
+      console.error(error); // silence lint
+    } finally {
+      setLoading(false);
+    }
+  }, [slug, error]);
 
   useEffect(() => {
-    const fetchSchema = async () => {
-      try {
-        const { data } = await api.get(`/api/schema/pull?projectSlug=${slug}&environment=development`);
-        setVariables(data.variables);
-      } catch (err) {
-        setError('Failed to fetch schema details. Are your settings correct?');
-        console.error(error); // silence lint
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchSchema();
-  }, [slug]);
+  }, [fetchSchema]);
+
+  // When a socket drift payload arrives, wait a moment before clearing the banner, but refetch instantly
+  useEffect(() => {
+    if (driftPayload) {
+      fetchSchema();
+      const timer = setTimeout(() => resetDriftAlert(), 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [driftPayload, fetchSchema, resetDriftAlert]);
 
   return (
     <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
@@ -53,13 +68,16 @@ export default function ProjectDetail() {
         </div>
       </div>
 
-      <Alert variant="destructive" className="bg-destructive/10 text-destructive border-destructive/20 shadow-sm animate-in fade-in zoom-in-95 duration-500">
-        <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Drift Detected</AlertTitle>
-        <AlertDescription>
-          Your local <code className="text-xs bg-destructive/20 px-1 rounded">.env</code> is missing <b>DATABASE_URL</b> which is marked as required.
-        </AlertDescription>
-      </Alert>
+      {driftPayload && (
+        <Alert className="bg-primary/10 text-primary border-primary/20 shadow-sm animate-in fade-in zoom-in-95 duration-500">
+          <Zap className="h-4 w-4" />
+          <AlertTitle>Schema Synced live!</AlertTitle>
+          <AlertDescription>
+            Your teammate just updated <code className="text-xs bg-primary/20 px-1 rounded">{driftPayload.environment}</code> schema 
+            (Added: {driftPayload.added}, Updated: {driftPayload.updated}, Removed: {driftPayload.removed}). The table below has been refreshed!
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden">
         <Table>

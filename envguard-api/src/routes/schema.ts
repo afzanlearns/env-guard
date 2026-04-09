@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
 import { sanitizeSchemaPayload } from '../middleware/sanitize.middleware';
 import { query } from '../db';
+import { getIO } from '../sockets/drift.socket';
+import { notifyDrift } from '../services/notify.service';
 
 const router = Router();
 
@@ -60,17 +62,35 @@ router.post('/push', requireAuth, sanitizeSchemaPayload, async (req: any, res) =
       WHERE environment_id = $1 AND key != ALL($2::text[])
     `;
     const delRes = await query(delQuery, [envId, currentKeys]);
-    const removed = delRes.rowCount;
+    const removed = delRes.rowCount ?? 0;
 
     // Log to Audit Log
-    const projRes = await query('SELECT id FROM projects WHERE slug = $1', [projectSlug]);
+    const projRes = await query('SELECT id, name FROM projects WHERE slug = $1', [projectSlug]);
+    const projectRow = projRes.rows[0];
+    
     await query(`
       INSERT INTO audit_log (project_id, environment_id, actor_id, action, metadata, source)
       VALUES ($1, $2, $3, 'schema_pushed', $4, 'cli')
-    `, [projRes.rows[0].id, envId, req.user.id, JSON.stringify({ added, updated, removed })]);
+    `, [projectRow.id, envId, req.user.id, JSON.stringify({ added, updated, removed })]);
 
     await query('COMMIT');
     res.json({ syncedCount: variables.length, added, updated, removed });
+
+    // Background notifications and emissions
+    if (added > 0 || updated > 0 || removed > 0) {
+      const io = getIO();
+      io.to(`project:${projectRow.id}`).emit('drift:update', {
+        environment,
+        syncedCount: variables.length,
+        added, 
+        updated, 
+        removed
+      });
+
+      // Dispatch to Slack
+      notifyDrift(projectRow.name, environment, req.user.username, added, removed, updated);
+    }
+
   } catch (err) {
     await query('ROLLBACK');
     res.status(500).json({ error: 'Failed to push schema' });
@@ -82,12 +102,14 @@ router.get('/pull', requireAuth, async (req, res) => {
   
   if (!projectSlug || !environment) return res.status(400).json({ error: 'Missing params' });
 
-  const envId = await getEnvId(projectSlug, environment);
-  if (!envId) return res.status(404).json({ error: 'Project or environment not found' });
+  const envRes = await query('SELECT e.id, p.id as project_id FROM environments e JOIN projects p ON p.id = e.project_id WHERE p.slug = $1 AND e.name = $2', [projectSlug, environment]);
+  const envRow = envRes.rows[0];
+  if (!envRow) return res.status(404).json({ error: 'Project or environment not found' });
 
-  const { rows } = await query('SELECT key, type, description, required, default_hint as "defaultHint" FROM schema_variables WHERE environment_id = $1', [envId]);
+  const { rows } = await query('SELECT key, type, description, required, default_hint as "defaultHint" FROM schema_variables WHERE environment_id = $1', [envRow.id]);
 
   res.json({
+    projectId: envRow.project_id,
     environment,
     variables: rows,
     lastSyncedAt: new Date().toISOString()
