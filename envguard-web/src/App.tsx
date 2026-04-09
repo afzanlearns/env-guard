@@ -4,12 +4,13 @@ import Dashboard from './pages/Dashboard';
 import ProjectDetail from './pages/ProjectDetail';
 import LandingPage from './pages/LandingPage';
 import { AuthProvider, useAuth } from './hooks/useAuth';
+import type { ReactNode } from 'react';
 
-function PrivateRoute({ children }: { children: JSX.Element }) {
+function PrivateRoute({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return <div className="p-8 text-center">Loading context...</div>;
   if (!user) return <Navigate to="/" />;
-  return children;
+  return <>{children}</>;
 }
 
 function Layout() {

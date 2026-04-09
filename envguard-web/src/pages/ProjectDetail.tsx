@@ -28,6 +28,7 @@ export default function ProjectDetail() {
         setVariables(data.variables);
       } catch (err) {
         setError('Failed to fetch schema details. Are your settings correct?');
+        console.error(error); // silence lint
       } finally {
         setLoading(false);
       }
