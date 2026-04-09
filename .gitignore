@@ -5,3 +5,6 @@ node_modules/
 .envguard_token_fallback
 test-proj/
 .envguard/
+dist/
+envguard-api/dist/
+envguard-cli/dist/

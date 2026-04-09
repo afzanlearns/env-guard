@@ -21,6 +21,11 @@ try {
   }
 }
 
+import { init } from '../commands/init.js';
+import { login } from '../commands/auth.js';
+import { push } from '../commands/push.js';
+import { status } from '../commands/status.js';
+
 const program = new Command();
 
 program
@@ -32,8 +37,7 @@ program
   .command('init')
   .description('Link the current directory to an EnvGuard project')
   .action(async () => {
-    const { init } = await import('../src/commands/init.js');
-    init();
+    await init();
   });
 
 program
@@ -43,8 +47,7 @@ program
     new Command('login')
       .description('Authenticate with EnvGuard')
       .action(async () => {
-        const { login } = await import('../src/commands/auth.js');
-        login();
+        await login();
       })
   );
 
@@ -56,16 +59,14 @@ program
   .option('--no-interactive', 'skip prompts, push with existing/inferred metadata only')
   .option('--allow-empty', 'allow pushing an empty schema')
   .action(async (options) => {
-    const { push } = await import('../src/commands/push.js');
-    push(options);
+    await push(options);
   });
 
 program
   .command('status')
   .description('Compare local .env keys against team schema')
   .action(async () => {
-    const { status } = await import('../src/commands/status.js');
-    status();
+    await status();
   });
 
 program.parse(process.argv);
