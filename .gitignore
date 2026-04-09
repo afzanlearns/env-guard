@@ -1,0 +1,7 @@
+node_modules/
+.DS_Store
+*.log
+.env
+.envguard_token_fallback
+test-proj/
+.envguard/

@@ -1,0 +1,11 @@
+{
+  "name": "envguard-monorepo",
+  "version": "1.0.0",
+  "description": "EnvGuard - Schema-based env syncing tool",
+  "workspaces": [
+    "envguard-cli"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
